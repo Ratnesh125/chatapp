@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import axios from 'axios';
@@ -13,6 +13,18 @@ const Interface = () => {
     const [currentRoom, setCurrentRoom] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [socket, setSocket] = useState(null);
+    const [typingUsers, setTypingUsers] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const typingTimeoutRef = useRef(null);
+    const messagesEndRef = useRef(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
 
     const copyToClipboard = (roomCode) => {
         navigator.clipboard.writeText(roomCode).then(() => {
@@ -44,6 +56,9 @@ const Interface = () => {
                 setRooms(response.data);
             } catch (error) {
                 console.error('Error fetching rooms', error);
+                if (error.response.status === 401) {
+                    navigate('/signin')
+                }
             }
         };
 
@@ -83,6 +98,20 @@ const Interface = () => {
                 });
             });
 
+            socket.on('typing', (username) => {
+                setTypingUsers((prev) => {
+                    if (!prev.includes(username)) {
+                        return [...prev, username];
+                    }
+                    return prev;
+                });
+            });
+
+            socket.on('stop typing', (username) => {
+                setTypingUsers((prev) => prev.filter((user) => user !== username));
+            });
+
+
             return () => {
                 socket.emit('leaveRoom', { roomCode: currentRoom.roomCode, user });
                 socket.off('message');
@@ -104,6 +133,18 @@ const Interface = () => {
             setMessage('');
         }
     };
+
+    const handleTyping = () => {
+        socket.emit('typing', user?.name);
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => {
+            socket.emit('stop typing', user?.name);
+        }, 3000);
+    };
+
+    const filteredRooms = rooms.filter((room) =>
+        room.roomName.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     const joinRoom = (room) => {
         console.log(room);
@@ -130,12 +171,19 @@ const Interface = () => {
                                     <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                                 </svg>
                             </span>
-                            <input type="search" className="block w-full py-2 pl-10 bg-gray-100 rounded outline-none" name="search"
-                                placeholder="Search" required />
+                            <input
+                                type="search"
+                                className="block w-full py-2 pl-10 bg-gray-100 rounded outline-none"
+                                name="search"
+                                placeholder="Search"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                required
+                            />
                         </div>
                         <ul className="overflow-auto mt-3">
                             <h2 className="my-2 mb-2 ml-2 text-lg text-gray-600">Rooms</h2>
-                            {rooms.map((room) => (
+                            {filteredRooms.map((room) => (
                                 <li key={room._id} className="flex items-center px-3 py-2 text-sm transition duration-150 ease-in-out border-b border-gray-300 cursor-pointer hover:bg-gray-100 focus:outline-none" onClick={() => joinRoom(room)}>
                                     <div className="flex justify-between w-full pb-2">
                                         <span className="block ml-2 font-semibold text-xl text-gray-600">{room.roomName}</span>
@@ -166,42 +214,67 @@ const Interface = () => {
                 </div>
                 <div className="w-full lg:w-2/3 flex flex-col">
                     <div className="w-full border-b border-gray-300 p-3">
-                        {currentRoom && (
+                        {currentRoom && (<div>
+
                             <span className="block font-bold text-gray-600">{currentRoom.roomName}</span>
+                            <span className="block font-bold text-gray-600">
+                                {typingUsers.length > 0 ? `${typingUsers.join(', ')} is typing...` : ''}
+                            </span>
+                        </div>
                         )}
                     </div>
                     <div className="flex-1 p-6 overflow-y-auto">
-                        <ul className="space-y-2">
-                            {messages.map((msg, index) => (
-                                <li key={index} className={`flex ${msg.userId === user._id ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`relative max-w-xl px-4 py-2 text-gray-700 ${msg.userId === user._id ? 'bg-gray-100' : 'bg-white'} rounded shadow`}>
-                                        <div className="flex items-center space-x-2">
-                                            <span className="font-semibold text-sm">{msg.user}</span>
+                        {messages.length === 0 ? (
+                            <div className="h-full w-full flex items-center justify-center text-gray-500">
+                                No messages yet. Start the conversation!
+                            </div>
+                        ) : (
+                            <ul className="space-y-2">
+                                {messages.map((msg, index) => (
+                                    <li key={index} className={`flex ${msg.userId === user._id ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`relative max-w-xl px-4 py-2 text-gray-700 ${msg.userId === user._id ? 'bg-gray-100' : 'bg-white'} rounded shadow`}>
+                                            <div className="flex items-center space-x-2">
+                                                <span className="font-semibold text-sm">{msg.user}</span>
+                                            </div>
+                                            <span className="block mt-1 text-lg">{msg.text}</span>
+                                            <div className="flex items-center space-x-2">
+                                                <span className="font-semibold text-xs">{new Date(msg.createdAt).toUTCString()}</span>
+                                            </div>
                                         </div>
-                                        <span className="block mt-1 text-lg">{msg.text}</span>
-                                        <div className="flex items-center space-x-2">
-                                            <span className="font-semibold text-xs">{new Date(msg.createdAt).toUTCString()}</span>
-                                        </div>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
+                                    </li>
+                                ))}
+                                <div ref={messagesEndRef} />
+                            </ul>
+                        )}
                     </div>
 
-                    <div className="w-full border-t border-gray-300 p-3 pb-8 flex items-center">
-                        <input type="text" placeholder="Message"
-                            className="block w-full py-4 pl-4 mx-6 bg-gray-100 rounded-full outline-none focus:text-gray-700"
-                            value={message}
-                            onChange={(e) => setMessage(e.target.value)}
-                            required />
-                        <button type="submit" onClick={sendMessage}>
-                            <svg className="w-5 h-5 text-gray-500 origin-center transform rotate-90" xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 20 20" fill="currentColor">
-                                <path
-                                    d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                            </svg>
-                        </button>
-                    </div>
+                    {messages.length > 0 && (
+                        <div className="w-full border-t border-gray-300 p-3 pb-8 flex items-center">
+                            <input
+                                type="text"
+                                placeholder="Message"
+                                className="block w-full py-4 pl-4 mx-6 bg-gray-100 rounded-full outline-none focus:text-gray-700"
+                                value={message}
+                                onChange={(e) => {
+                                    setMessage(e.target.value);
+                                    handleTyping();
+                                }}
+                                required
+                            />
+                            <button type="submit" onClick={sendMessage}>
+                                <svg
+                                    className="w-5 h-5 text-gray-500 origin-center transform rotate-90"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                >
+                                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                                </svg>
+                            </button>
+                        </div>
+                    )}
+
+
                 </div>
             </div>
         </div>

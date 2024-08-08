@@ -65,6 +65,20 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('typing', (username) => {
+    const roomCode = Array.from(socket.rooms)[1]; // Get the room the user is currently in
+    if (roomCode) {
+      socket.to(roomCode).emit('typing', username);
+    }
+  });
+
+  socket.on('stop typing', (username) => {
+    const roomCode = Array.from(socket.rooms)[1]; // Get the room the user is currently in
+    if (roomCode) {
+      socket.to(roomCode).emit('stop typing', username);
+    }
+  });
+
   socket.on('joinRoom', ({ roomCode, user }) => {
     try {
       if (!roomCode || !user || !user.name) {

@@ -19,7 +19,7 @@ const Signin = () => {
 
             localStorage.setItem('user', JSON.stringify(result));
             localStorage.setItem('token', token);
-            
+
             navigate('/');
         } catch (error) {
             setError('Invalid email or password');
@@ -30,6 +30,9 @@ const Signin = () => {
     return (
         <div className="flex justify-center items-center min-h-screen bg-gray-100">
             <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-md">
+                <div className="overflow-auto">{import.meta.env.VITE_API_INSTRUCTION}  </div>
+                <div>{import.meta.env.VITE_API_EMAIL} </div>
+                <div>{import.meta.env.VITE_API_PASSWORD}</div>
                 <h2 className="text-2xl font-bold mb-6 text-center">Signin</h2>
                 {error && <p className="text-red-500 mb-4 text-center">{error}</p>}
                 <form onSubmit={handleSubmit}>
@@ -66,6 +69,13 @@ const Signin = () => {
                         className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         Signin
+                    </button>
+                    <span>new user?</span>
+                    <button
+                        onClick={() => navigate("/signup")}
+                        className="py-2 px-2 rounded-lg hover:text-gray-400"
+                    >
+                        Click here to register
                     </button>
                 </form>
             </div>

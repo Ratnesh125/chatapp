@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const Signup = () => {
     const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+    const navigate = useNavigate();
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -58,6 +60,13 @@ const Signup = () => {
                         className="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                         Signup
+                    </button>
+                    <span>existing user?</span>
+                    <button
+                        onClick={() => navigate("/signin")}
+                        className="py-2 px-2 rounded-lg hover:text-gray-400"
+                    >
+                        Click here to siginin
                     </button>
                 </form>
             </div>
